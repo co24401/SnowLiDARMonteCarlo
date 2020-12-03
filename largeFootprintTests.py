@@ -12,6 +12,7 @@ import time
 from numba import cuda
 from numba.cuda.random import create_xoroshiro128p_states, xoroshiro128p_uniform_float32
 import sys
+#from numba import jit
 
 # %% Define medium input parameters
 
@@ -26,7 +27,7 @@ density_snow = 250 # kg/m3 For moderately settled snow, but still dry
 
 m_soot = 1.8 + 0.5j # not wavelength dependent in WWII 1981
 r_soot = 0.1E-6
-f_soot = 1E-6 # density_soot/density_snow (1E-6 = 1 ppmw soot)
+f_soot = 0.#1E-6 # density_soot/density_snow (1E-6 = 1 ppmw soot)
 
 pfun_bins = 1000
 
@@ -47,8 +48,8 @@ print('Snowpack properties generated')
 # single batch run
 
 # Simulation params
-batchSize = 1000
-max_photons_per_thread = 10000
+batchSize = 10000
+max_photons_per_thread = 100000
 max_N = 1e5
 max_distance_from_det = 100.0
 
@@ -123,6 +124,16 @@ max_photons_per_thread = 100
 batchSize = blockSize*gridSize*photons_per_thread
 
 device_id = 0
+
+# P = medium_params_mie['P']
+# bin_edges = np.linspace(-1, 1, 1001)
+# cdf_P = np.zeros_like(bin_edges)
+# cdf_P[1:] = np.cumsum(P)
+# inv_cdf_P = lambda xi: np.interp(xi, cdf_P, bin_edges)
+
+# @jit
+# def inv_cdf_P(xi):
+#     return np.interp(xi, cdf_P, bin_edges)
 
 cuda.select_device(device_id)
 device = cuda.get_current_device()
@@ -199,7 +210,137 @@ plt.hist(batch_data_HG[:, 1], bins=1000, log='True', weights=batch_data_HG[:, 8]
 plt.title('Distance Traveled -- Henyey-Greenstein')
 plt.show()
 
+# %%  Batch CPU Quantized vs weight-based simulations
+# Explicitly define required simulation, source, and detector parameters for 
+# single batch run
 
+# Simulation params
+batchSize = 100000
+max_photons_per_thread = 1000000
+max_N = 1e5
+max_distance_from_det = 100.0
+
+# Source params
+source_pos = np.array([0., 0., 0.])
+source_mu = np.array([0., 0., 1.])
+source_radius = 1.
+
+# Detector params
+detector_radius = 1.
+
+# Medium params
+muS = medium_params_HG['muS']
+muA = medium_params_HG['muA']
+g = medium_params_HG['g']
+z_bounded = medium_params_HG['z_bounded']
+z_range = medium_params_HG['z_range']
+
+rng = np.random.default_rng()
+
+# batch_data_wts = np.zeros(shape=(batchSize, 9), dtype=np.float32)
+# batch_counters_wts = np.zeros(shape=(3), dtype=np.int)
+
+# print('Beginning CPU MC simulations')
+
+# tic = time.time()
+
+# snow.propPhotonCPU(rng, batch_data_wts, batch_counters_wts,
+#                                          batchSize, max_photons_per_thread,
+#                                          max_N, max_distance_from_det,
+#                                          muS, muA, g, z_bounded, z_range,
+#                                          source_pos, source_mu, source_radius,
+#                                          detector_radius)
+
+# print(time.time() - tic)
+
+batch_data_qnt = np.zeros(shape=(batchSize, 9), dtype=np.float32)
+batch_counters_qnt = np.zeros(shape=(3), dtype=np.int)
+
+tic = time.time()
+
+snow.propQuantizedPhotonsCPU(rng, batch_data_qnt, batch_counters_qnt,
+                                         batchSize, max_photons_per_thread,
+                                         max_N, max_distance_from_det,
+                                         muS, muA, g, z_bounded, z_range,
+                                         source_pos, source_mu, source_radius,
+                                         detector_radius)
+
+print(time.time() - tic)
+
+# plt.hist(batch_data_wts[:, 1], bins=200, log='True', weights=batch_data_wts[:, 8]); 
+# plt.title('Distance Traveled -- Weighted Photons')
+# plt.show()
+
+plt.hist(batch_data_qnt[:, 1], bins=200, log='True'); 
+plt.title('Distance Traveled -- Quantized Photons')
+plt.show()
+
+# %% Batch GPU test.  Quantized propagation
+
+max_N = 1e6
+max_distance_from_det = 1000.0
+
+# Source params
+source_pos = np.array([0., 0., 0.])
+source_mu = np.array([0., 0., 1.])
+source_radius = 0.
+
+# Detector params
+detector_radius = 1000.
+
+# Medium params
+muS = medium_params_HG['muS']
+muA = medium_params_HG['muA']
+g = medium_params_HG['g']
+z_bounded = medium_params_HG['z_bounded']
+z_range = medium_params_HG['z_range']
+
+blockSize = 256 # Threads per block.  Should be multiple of 32.
+gridSize = 126 # Blocks per grid.  Should be multiple of # of SMs on GPU
+photons_per_thread = 30
+max_photons_per_thread = 100
+batchSize = blockSize*gridSize*photons_per_thread
+
+device_id = 0
+
+cuda.select_device(device_id)
+device = cuda.get_current_device()
+stream = cuda.stream()
+
+# HG simulation
+
+batch_data = np.zeros(shape=(blockSize*gridSize, photons_per_thread, 9), dtype=np.float32)
+batch_counters = np.zeros(shape=(blockSize*gridSize, 3), dtype=np.int)
+
+batch_data_device = cuda.device_array_like(batch_data, stream=stream)
+batch_counters_device = cuda.device_array_like(batch_counters, stream=stream)
+
+print('Beginning GPU MC simulations')
+
+tic = time.time()
+
+snow.propQuantizedPhotonsGPU[gridSize, blockSize](rng_states, batch_data_device, batch_counters_device,
+                                         photons_per_thread, max_photons_per_thread,
+                                         max_N, max_distance_from_det,
+                                         muS, muA, g, z_bounded, z_range,
+                                         source_pos, source_mu, source_radius,
+                                         detector_radius)
+
+print(time.time() - tic)
+
+# Copy data back
+batch_data_device.copy_to_host(batch_data, stream=stream)
+batch_counters_device.copy_to_host(batch_counters, stream=stream)
+stream.synchronize() # Don't continue until data copied to host
+
+batch_data = batch_data.reshape(batch_data.shape[0]*batch_data.shape[1], batch_data.shape[2])        
+batch_counters_aggr = np.squeeze(np.sum(batch_counters, axis=0))
+
+batch_data = batch_data[batch_data[:, 0]>0, :]
+
+plt.hist(batch_data[:, 1], bins=1000, log='True'); 
+plt.title('Distance Traveled -- Quantized Photons')
+plt.show()
 
 
 
