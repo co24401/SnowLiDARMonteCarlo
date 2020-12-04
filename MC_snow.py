@@ -182,7 +182,8 @@ def run_d_MC(simulation_params = {'device_id': 0, 'batchSize': 3225600,
                                   'nPhotonsRequested': 1e7, 
                                   'nPhotonsToRun': 1e10, 
                                   'max_N': 1e5, 
-                                  'max_distance_from_det': 100.0}, 
+                                  'max_distance_from_det': 100.0, 
+                                  'quantized': True}, 
              medium_params = {'muS': 820.0, 'muA': .00820, 'g': 0.89, 
                               'mie': False,
                               'z_bounded': False, 
@@ -200,6 +201,7 @@ def run_d_MC(simulation_params = {'device_id': 0, 'batchSize': 3225600,
     nPhotonsToRun = int(simulation_params['nPhotonsToRun'])
     max_N = int(simulation_params['max_N'])
     max_distance_from_det = float(simulation_params['max_distance_from_det'])
+    quantized = bool(simulation_params['quantized'])
 
     # Medium params
     muS = float(medium_params['muS'])  # Scattering coefficient (1/m)
@@ -257,13 +259,23 @@ def run_d_MC(simulation_params = {'device_id': 0, 'batchSize': 3225600,
                                                      detector_radius)            
         
         else:
-            # Kernel call
-            propPhotonGPU[gridSize, blockSize](rng_states, batch_data_device, batch_counters_device,
-                                                     photons_per_thread, max_photons_per_thread,
-                                                     max_N, max_distance_from_det,
-                                                     muS, muA, g, z_bounded, z_range,
-                                                     source_pos, source_mu, source_radius,
-                                                     detector_radius)
+            
+            if quantized:
+                # Kernel call
+                propQuantizedPhotonsGPU[gridSize, blockSize](rng_states, batch_data_device, batch_counters_device,
+                                                         photons_per_thread, max_photons_per_thread,
+                                                         max_N, max_distance_from_det,
+                                                         muS, muA, g, z_bounded, z_range,
+                                                         source_pos, source_mu, source_radius,
+                                                         detector_radius)
+            else:   
+                # Kernel call
+                propPhotonGPU[gridSize, blockSize](rng_states, batch_data_device, batch_counters_device,
+                                                         photons_per_thread, max_photons_per_thread,
+                                                         max_N, max_distance_from_det,
+                                                         muS, muA, g, z_bounded, z_range,
+                                                         source_pos, source_mu, source_radius,
+                                                         detector_radius)
         
         # Copy data back
         batch_data_device.copy_to_host(batch_data, stream=stream)
@@ -281,6 +293,8 @@ def run_d_MC(simulation_params = {'device_id': 0, 'batchSize': 3225600,
         data[photon_counters[1] : (photon_counters[1]+batch_data.shape[0]), :] = batch_data
 
         photon_counters += batch_counters_aggr
+        
+        print('{} photons detected out of {}.'.format(photon_counters[1], nPhotonsRequested))
 
     data = data[:photon_counters[1], :]
     return data, photon_counters

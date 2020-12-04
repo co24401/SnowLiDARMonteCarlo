@@ -74,5 +74,5 @@ print('r =  {},  rho = {}'.format(rs[amin[0]], rhos[amin[1]]))
 loss_a1 = (a1s-a1_true)**2/(a1s**2)
 amin_rho = np.argmin(np.sum(loss_a1, axis=0))
 plt.plot(np.log(np.sum(loss_a1, axis=0)))
-print('rho = {}'.format(rhos[amin_rho))
+print('rho = {}'.format(rhos[amin_rho]))
     
