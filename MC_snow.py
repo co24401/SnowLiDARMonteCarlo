@@ -21,7 +21,7 @@ def snowpackScatterProperties(wavelength, m_ice, r_ice, density_snow,
     density_ice = 920 # kg / m3 at T = -30 C, P = 1 atm
     density_air = 1.451 # kg / m3 at T = -30 C, P = 1 atm
     
-    icegrain_properties = ps.MieQ(m_ice, wavelength*1E9, r_ice*1E9, asDict=True)
+    icegrain_properties = ps.MieQ(m_ice, wavelength*1E9, 2*r_ice*1E9, asDict=True)
     
     #N_snow = 3*(density_snow - density_air)/(4*math.pi*( density_ice - density_air )*r_ice**3)
     
@@ -35,7 +35,7 @@ def snowpackScatterProperties(wavelength, m_ice, r_ice, density_snow,
     n_snow = 1 + (m_ice.real - 1) * (density_snow - density_air)/(density_ice - density_air)
     c_snow = c / n_snow
     
-    sootgrain_properties = ps.MieQ(m_soot, wavelength*1E9, r_soot*1E9, asDict=True)
+    sootgrain_properties = ps.MieQ(m_soot, wavelength*1E9, 2*r_soot*1E9, asDict=True)
     
     Qsca_soot = sootgrain_properties['Qsca']
     Qabs_soot = sootgrain_properties['Qabs']

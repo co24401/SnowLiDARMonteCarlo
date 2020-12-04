@@ -34,8 +34,8 @@ pfun_bins = 1000
 
 # %% Generate medium
 
-medium_params_mie = snow.snowpackScatterProperties(wavelength, m_ice, r_ice, \
-                    density_snow, m_soot, r_soot, f_soot, pfunsmoothing=False, mie=True)
+#medium_params_mie = snow.snowpackScatterProperties(wavelength, m_ice, r_ice, \
+#                    density_snow, m_soot, r_soot, f_soot, pfunsmoothing=False, mie=True)
     
 medium_params_HG = snow.snowpackScatterProperties(wavelength, m_ice, r_ice, \
                     density_snow, m_soot, r_soot, f_soot, pfunsmoothing=False, mie=False)
@@ -297,7 +297,7 @@ z_range = medium_params_HG['z_range']
 
 blockSize = 256 # Threads per block.  Should be multiple of 32.
 gridSize = 126 # Blocks per grid.  Should be multiple of # of SMs on GPU
-photons_per_thread = 30
+photons_per_thread = 10
 max_photons_per_thread = 100
 batchSize = blockSize*gridSize*photons_per_thread
 
