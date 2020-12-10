@@ -1302,4 +1302,142 @@ def propQuantizedPhotonsCPU(rng, data_out, photon_counters,
     photon_counters[0] = photon_cnt_tot
     photon_counters[1] = photons_cnt_detected
     photon_counters[2] = photons_cnt_stopped
+
+# This actually works for spatial spread as well.  You should maybe rename it
+# "fitDiffusionCurve"    
+def fitLargeFootprintDiffusionCurve(t, m, a3constraint = False):
+    
+    y = np.log(m) # Fit to log of photon counts
+    w = m # Input m are Poission counts.  Weights 1/sigma_y^2 = m
+    
+    # Defining functions explicitly for readaility and so that can fit to 
+    # different sets of functions in future
+    f0 = np.ones_like(t)
+    f1 = t
+    f2 = 1./t
+    f3 = np.log(t)
+    
+    if a3constraint:
+        y = y + 1.5*f3
+        b = np.array([np.nansum(y*f0*w), \
+                      np.nansum(y*f1*w), \
+                      np.nansum(y*f2*w)] )
+            
+        aa00 = np.nansum(w*f0**2)
+        aa01 = np.nansum(w*f1*f0)
+        aa02 = np.nansum(w*f2*f0)
+        
+        aa11 = np.nansum(w*f1**2)
+        aa12 = np.nansum(w*f1*f2)
+        
+        aa22 = np.nansum(w*f2**2)
+        
+        A = np.array([[aa00, aa01, aa02], [aa01, aa11, aa12], \
+                      [aa02, aa12, aa22]])
+            
+        V = np.linalg.inv(A)
+        p = V@b
+        
+    else:
+        b = np.array([np.nansum(y*f0*w), \
+                      np.nansum(y*f1*w), \
+                      np.nansum(y*f2*w), \
+                      np.nansum(y*f3*w)] )
+            
+        aa00 = np.nansum(w*f0**2)
+        aa01 = np.nansum(w*f1*f0)
+        aa02 = np.nansum(w*f2*f0)
+        aa03 = np.nansum(w*f3*f0)
+        
+        aa11 = np.nansum(w*f1**2)
+        aa12 = np.nansum(w*f1*f2)
+        aa13 = np.nansum(w*f1*f3)
+        
+        aa22 = np.nansum(w*f2**2)
+        aa23 = np.nansum(w*f2*f3)
+        
+        aa33 = np.nansum(w*f3**2)
+        
+        A = np.array([[aa00, aa01, aa02, aa03], [aa01, aa11, aa12, aa13], \
+                      [aa02, aa12, aa22, aa23], [aa03, aa13, aa23, aa33]])
+            
+        V = np.linalg.inv(A)
+        p = V@b
+    
+    return p, V
+
+def diffusionParameterLookupTable(wavelength, m_ice, r_lims, num_r, rho_lims, num_rho):
+
+    c = 299792458 # Speed of light (m/s)
+    
+    density_ice = 920 # kg / m3 at T = -30 C, P = 1 atm
+    density_air = 1.451 # kg / m3 at T = -30 C, P = 1 atm
+    
+    r = np.linspace(r_lims[0], r_lims[1], num_r)
+    rho = np.linspace(rho_lims[0], rho_lims[1], num_rho)
+    
+    muSs = np.zeros((num_r, num_rho))
+    muAs = np.zeros_like(muSs)
+    gs = np.zeros_like(muSs)
+    c_snows = np.zeros_like(muSs)
+    
+    for jj in range(0, num_rho):
+        n_snow = 1 + (m_ice.real - 1) * (rho[jj] - density_air)/(density_ice - density_air)
+        c_snows[:, jj] = c/n_snow
+    
+    for ii in range(0, num_r):        
+        
+        _, Qs, Qa, g, _, _, _ = ps.MieQ(m_ice, wavelength*1E9, 2*r[ii]*1E9)
+        gs[ii, :] = g
+        
+        for jj in range(0, num_rho):
+            
+            muSs[ii, jj] = 3*(rho[jj] - density_air)*Qs/(4*(density_ice - density_air)*r[ii])
+            muAs[ii, jj] = 3*(rho[jj] - density_air)*Qa/(4*(density_ice - density_air)*r[ii])
+
+    z0s = 1/(muSs*(1-gs))
+    Ds = 1/(3*(muAs + (1-gs)*muSs))
+    
+    a1s = -muAs*c_snows
+    a2s = -z0s**2/(4*Ds*c_snows)
+    
+    return a1s, a2s, r, rho
+
+def diffusionParameterLookupTable_offset(wavelength, m_ice, s_o, r_lims, num_r, \
+                                         rho_lims, num_rho):
+
+    c = 299792458 # Speed of light (m/s)
+    
+    density_ice = 920 # kg / m3 at T = -30 C, P = 1 atm
+    density_air = 1.451 # kg / m3 at T = -30 C, P = 1 atm
+    
+    r = np.linspace(r_lims[0], r_lims[1], num_r)
+    rho = np.linspace(rho_lims[0], rho_lims[1], num_rho)
+    
+    muSs = np.zeros((num_r, num_rho))
+    muAs = np.zeros_like(muSs)
+    gs = np.zeros_like(muSs)
+    c_snows = np.zeros_like(muSs)
+    
+    for jj in range(0, num_rho):
+        n_snow = 1 + (m_ice.real - 1) * (rho[jj] - density_air)/(density_ice - density_air)
+        c_snows[:, jj] = c/n_snow
+    
+    for ii in range(0, num_r):        
+        
+        _, Qs, Qa, g, _, _, _ = ps.MieQ(m_ice, wavelength*1E9, 2*r[ii]*1E9)
+        gs[ii, :] = g
+        
+        for jj in range(0, num_rho):
+            
+            muSs[ii, jj] = 3*(rho[jj] - density_air)*Qs/(4*(density_ice - density_air)*r[ii])
+            muAs[ii, jj] = 3*(rho[jj] - density_air)*Qa/(4*(density_ice - density_air)*r[ii])
+
+    #z0s = 1/(muSs*(1-gs))
+    Ds = 1/(3*(muAs + (1-gs)*muSs))
+    
+    a1s = -muAs*c_snows
+    a2s = -s_o**2 / (4*Ds*c_snows)
+    
+    return a1s, a2s, r, rho
     

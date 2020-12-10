@@ -9,9 +9,9 @@ import numpy as np
 
 # %% 
 
-simulation_params = {'device_id': 0, 'batchSize': 32256, 
-                                  'nPhotonsRequested': 32256, 
-                                  'nPhotonsToRun': 1e10, 
+simulation_params = {'device_id': 0, 'batchSize': 1044480*2, 
+                                  'nPhotonsRequested': 1044480*40, 
+                                  'nPhotonsToRun': 5e8, 
                                   'max_N': 1e6, 
                                   'max_distance_from_det': 1000.0, 
                                   'quantized': True}
@@ -50,7 +50,7 @@ data, counters = snow.run_d_MC(simulation_params, medium_params,
 print('Simulation completed for spatiotemporal test')
 
 folder = './spatiotemporalTest/'
-filename = 'grain_radius_{}_density_{}_wavelength_{}'.format(r_snow, density_snow, wavelength)
+filename = 'grain_radius_{}_density_{}_wavelength_{}.npy'.format(r_snow, density_snow, wavelength)
 
 with open(folder + 'data_'+filename, 'wb') as f:
     np.save(f, data)
