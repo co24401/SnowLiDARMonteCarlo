@@ -53,11 +53,11 @@ plt.hist2d(s, data[:, 1]/c_snow, weights = 1/s, bins = (100, 100), norm = colors
 # %% 
 
 tmin = 0.
-tmax = 1E-6
+tmax = 4E-7
 num_t = 100
 
 smin = 0.
-smax = 1.5
+smax = 1
 num_s = 100
 
 plt.hist2d(100*s, 1E9*data[:, 1]/c_snow, weights = 1/s, bins = (num_t, num_s), \
@@ -74,10 +74,10 @@ plt.show();
 # tbins = np.linspace(tmin, tmax, num_t)
 # sbins = np.linspace(smin, smax, num_s)
 
-s_o = 0.3 # Distance between laser spot and observed spot on snowpack surface
+s_o = 0.06 # Distance between laser spot and observed spot on snowpack surface
 w_o = 0.01 # 
-num_bins = 500
-max_tt = 1E-6
+num_bins = 1000
+max_tt = 1E-7
 
 p_true = np.zeros(4)
 p_fit = np.zeros(4)

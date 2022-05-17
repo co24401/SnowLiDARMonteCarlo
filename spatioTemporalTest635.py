@@ -35,33 +35,39 @@ m_ice_640 = 1.3083 + 1.2200e-8j # Basement laser is 640 nm
 wavelength = 640.0E-9 #532.0E-9
 m_ice = m_ice_640
 density_snow = 166.9 # kg/m3 For moderately settled snow, but still dry
-r_snow = 100E-6
+#r_snow = 100E-6
+snow_rads = [50E-6, 100E-6, 200E-6]
 
 # Not used but including because will break my code otherwise
 m_soot = 1.8 + 0.5j # not wavelength dependent in WWII 1981
 r_soot = 0.1E-6
 f_soot = 0.#1E-6 # density_soot/density_snow (1E-6 = 1 ppmw soot)
 
-medium_params = snow.snowpackScatterProperties(wavelength, m_ice, r_snow, \
+
+# %%
+
+folder = './spatiotemporalTest640nm/'
+
+for ii, r_snow in enumerate(snow_rads):
+    
+    medium_params = snow.snowpackScatterProperties(wavelength, m_ice, r_snow, \
                 density_snow, m_soot, r_soot, f_soot, pfunsmoothing=False, mie=False)
+        
+    print('Snowpack proeprties generated. r = {}, rho = {}'.format(r_snow, density_snow))
+        
+    data, counters = snow.run_d_MC(simulation_params, medium_params, 
+                                  source_params, detector_params)
     
-print('Snowpack properties generated')
-
-# %% Run simulation
-
-data, counters = snow.run_d_MC(simulation_params, medium_params, 
-                                      source_params, detector_params)
-
-print('Simulation completed for spatiotemporal test')
-
-folder = './spatiotemporalTest/'
-filename = 'grain_radius_{}_density_{}_wavelength_{}.npy'.format(r_snow, density_snow, wavelength)
-
-with open(folder + 'data_'+filename, 'wb') as f:
-    np.save(f, data)
+    print('Simulation completed for snow r = {}'.format(r_snow))
     
-with open(folder + 'counters_'+filename, 'wb') as f:
-    np.save(f, counters)  
+
+    filename = 'grain_radius_{}_density_{}_wavelength_{}.npy'.format(r_snow, density_snow, wavelength)
     
-print('Data saved for spatiotemporal test.') 
+    with open(folder + 'data_'+filename, 'wb') as f:
+        np.save(f, data)
+        
+    with open(folder + 'counters_'+filename, 'wb') as f:
+        np.save(f, counters)  
+        
+    print('Data saved for spatiotemporal test.') 
     
