@@ -16,6 +16,8 @@ c = 299792458.
 m_ice_532 = 1.3116 + 1.4898e-9j
 m_ice_1064 = 1.3004 + 1.9e-6j
 
+m_ice_633 = 1.3084 + 1.0940e-8j
+
 # Not used but including because will break my code otherwise
 m_soot = 1.8 + 0.5j # not wavelength dependent in WWII 1981
 r_soot = 0.1E-6
